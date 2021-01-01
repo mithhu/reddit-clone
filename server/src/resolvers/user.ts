@@ -1,16 +1,17 @@
 import {
   Resolver,
-  InputType,
-  Field,
   Mutation,
   Arg,
+  InputType,
+  Field,
   Ctx,
   ObjectType,
   Query,
 } from "type-graphql";
-import argon2 from "argon2";
+import { MyContext } from "../types";
 import { User } from "../entities/User";
-import { MyContext } from "src/types";
+import argon2 from "argon2";
+import { EntityManager } from "@mikro-orm/postgresql";
 
 @InputType()
 class UsernamePasswordInput {
@@ -32,6 +33,7 @@ class FieldError {
 class UserResponse {
   @Field(() => [FieldError], { nullable: true })
   errors?: FieldError[];
+
   @Field(() => User, { nullable: true })
   user?: User;
 }
@@ -64,6 +66,7 @@ export class UserResolver {
         ],
       };
     }
+
     if (options.password.length <= 2) {
       return {
         errors: [
@@ -74,13 +77,21 @@ export class UserResolver {
         ],
       };
     }
+
     const hashedPassword = await argon2.hash(options.password);
-    const user = em.create(User, {
-      username: options.username,
-      password: hashedPassword,
-    });
+    let user;
     try {
-      await em.persistAndFlush(user);
+      const result = await (em as EntityManager)
+        .createQueryBuilder(User)
+        .getKnexQuery()
+        .insert({
+          username: options.username,
+          password: hashedPassword,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .returning("*");
+      user = result[0];
     } catch (err) {
       //|| err.detail.includes("already exists")) {
       // duplicate username error
@@ -96,7 +107,11 @@ export class UserResolver {
       }
     }
 
+    // store user id session
+    // this will set a cookie on the user
+    // keep them logged in
     req.session.userId = user.id;
+    console.log("USER", user);
     return { user };
   }
 
@@ -111,7 +126,7 @@ export class UserResolver {
         errors: [
           {
             field: "username",
-            message: "username doesn't exist",
+            message: "that username doesn't exist",
           },
         ],
       };
@@ -129,6 +144,9 @@ export class UserResolver {
     }
 
     req.session.userId = user.id;
-    return { user };
+
+    return {
+      user,
+    };
   }
 }
