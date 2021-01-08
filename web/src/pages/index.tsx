@@ -8,7 +8,7 @@ import { Layout } from "../components/Layout";
 const Index = () => {
   const [{ data }] = usePostsQuery({
     variables: {
-      limit: 2,
+      limit: 10,
     },
   });
   return (
