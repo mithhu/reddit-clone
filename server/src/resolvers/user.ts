@@ -1,22 +1,22 @@
-import argon2 from "argon2";
 import {
-  Arg,
-  Ctx,
-  Field,
+  Resolver,
   Mutation,
+  Arg,
+  Field,
+  Ctx,
   ObjectType,
   Query,
-  Resolver,
   FieldResolver,
   Root,
 } from "type-graphql";
-import { v4 } from "uuid";
-import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from "../constants";
-import { User } from "../entities/User";
 import { MyContext } from "../types";
-import { sendEmail } from "../utils/sendEmail";
-import { validateRegister } from "../utils/validateRegister";
+import { User } from "../entities/User";
+import argon2 from "argon2";
+import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from "../constants";
 import { UsernamePasswordInput } from "./UsernamePasswordInput";
+import { validateRegister } from "../utils/validateRegister";
+import { sendEmail } from "../utils/sendEmail";
+import { v4 } from "uuid";
 import { getConnection } from "typeorm";
 
 @ObjectType()
@@ -47,6 +47,7 @@ export class UserResolver {
     // current user wants to see someone elses email
     return "";
   }
+
   @Mutation(() => UserResponse)
   async changePassword(
     @Arg("token") token: string,
@@ -105,6 +106,7 @@ export class UserResolver {
 
     return { user };
   }
+
   @Mutation(() => Boolean)
   async forgotPassword(
     @Arg("email") email: string,
@@ -112,7 +114,7 @@ export class UserResolver {
   ) {
     const user = await User.findOne({ where: { email } });
     if (!user) {
-      // the Userail is not in the db
+      // the email is not in the db
       return true;
     }
 
@@ -134,15 +136,15 @@ export class UserResolver {
   }
 
   @Query(() => User, { nullable: true })
-  async me(@Ctx() { req }: MyContext) {
+  me(@Ctx() { req }: MyContext) {
     // you are not logged in
     if (!req.session.userId) {
       return null;
     }
+
     return User.findOne(req.session.userId);
   }
 
-  //register
   @Mutation(() => UserResponse)
   async register(
     @Arg("options") options: UsernamePasswordInput,
@@ -156,6 +158,7 @@ export class UserResolver {
     const hashedPassword = await argon2.hash(options.password);
     let user;
     try {
+      // User.create({}).save()
       const result = await getConnection()
         .createQueryBuilder()
         .insert()
@@ -185,8 +188,9 @@ export class UserResolver {
 
     // store user id session
     // this will set a cookie on the user
-    // keep thUser logged in
+    // keep them logged in
     req.session.userId = user.id;
+
     return { user };
   }
 
@@ -205,7 +209,7 @@ export class UserResolver {
       return {
         errors: [
           {
-            field: "usernameOrUserail",
+            field: "usernameOrEmail",
             message: "that username doesn't exist",
           },
         ],
@@ -229,6 +233,7 @@ export class UserResolver {
       user,
     };
   }
+
   @Mutation(() => Boolean)
   logout(@Ctx() { req, res }: MyContext) {
     return new Promise((resolve) =>
